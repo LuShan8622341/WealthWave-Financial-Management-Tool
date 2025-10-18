@@ -1,0 +1,100 @@
+name: Canary Deployment for WealthWave
+
+# Trigger on push to the main branch or a pull request to the main branch
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  canary-deploy:
+    # Use the latest Ubuntu as the runner environment
+    runs-on: ubuntu-latest
+
+    # Define environment variables, modify if necessary
+    env:
+      NODE_ENV: production
+
+    steps:
+    # Checkout the repository code
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    # Set up Node.js version
+    - name: Set up Node.js
+      uses: actions/setup-node@v2
+      with:
+        node-version: '14' # Modify the Node.js version according to your project needs
+
+    # Install dependencies
+    - name: Install dependencies
+      run: npm install
+
+    # Run tests
+    - name: Run tests
+      run: npm test
+
+    # Build the project
+    - name: Build the project
+      run: npm run build
+
+    # Deploy to Canary server
+    - name: Deploy to Canary server
+      run: |
+        ssh user@canary-server "cd /path/to/canary && git pull && npm install && npm run build"
+
+    # Monitor the Canary deployment performance (assumed to use monitoring tools or API)
+    - name: Monitor Canary deployment
+      run: |
+        echo "Monitoring Canary deployment..." 
+        # You can integrate any monitoring system, such as Prometheus, Grafana, or use API calls
+        sleep 30 # Wait for a period to observe the Canary deployment performance
+
+    # Based on the monitoring result, decide whether to proceed to production
+    - name: Proceed to production deploy?
+      if: success() # Check if monitoring data meets expectations to proceed with production
+      run: echo "Canary deployment successful, proceeding to production."
+
+  production-deploy:
+    needs: canary-deploy
+    runs-on: ubuntu-latest
+    if: success() # Deploy to production only if Canary deployment succeeds
+    env:
+      NODE_ENV: production
+
+    steps:
+    # Checkout the repository code
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    # Set up Node.js version
+    - name: Set up Node.js
+      uses: actions/setup-node@v2
+      with:
+        node-version: '14'
+
+    # Install dependencies
+    - name: Install dependencies
+      run: npm install
+
+    # Build the project
+    - name: Build the project
+      run: npm run build
+
+    # Deploy to Production server
+    - name: Deploy to Production server
+      run: |
+        ssh user@production-server "cd /path/to/production && git pull && npm install && npm run build"
+
+    # Notify successful production deployment
+    - name: Notify successful production deploy
+      if: success()
+      run: echo "Production deployment completed successfully."
+
+    # Notify failed production deployment
+    - name: Notify failed production deploy
+      if: failure()
+      run: echo "Production deployment failed."
